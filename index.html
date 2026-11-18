@@ -394,6 +394,16 @@
       box-shadow: 0 4px 10px rgb(23 98 181 / 24%);
     }
 
+    button:not(:disabled) { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid rgb(23 98 181 / 28%);
+      outline-offset: 2px;
+    }
+
+    .remove-button:hover { color: #a1382d; }
+    .secondary-button:hover { filter: brightness(.97); }
+    .primary-button:hover { background: var(--blue-deep); }
+
     .helper-copy {
       margin: 8px 0 0;
       color: #6f8397;
@@ -698,6 +708,11 @@
       letter-spacing: .05em;
     }
 
+    .status.fail {
+      color: #8e2c25;
+      background: #f7d8d3;
+    }
+
     .check-values {
       display: flex;
       justify-content: space-between;
@@ -738,6 +753,7 @@
     }
 
     .ratio-fill.amber { background: #dfa900; }
+    .ratio-fill.red { background: #c23e34; }
 
     .ratio-copy {
       display: flex;
@@ -792,6 +808,21 @@
     }
 
     .recommendation .primary-button { white-space: nowrap; }
+
+    .validation-alert {
+      margin: 0;
+      padding: 12px 14px;
+      color: #812d25;
+      background: #fff0ed;
+      border: 1px solid #efc3bd;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .validation-alert strong { display: block; margin-bottom: 3px; }
+    .point-load-handle { cursor: grab; touch-action: none; }
+    .point-load-handle:active { cursor: grabbing; }
 
     .footer-note {
       margin: 0;
@@ -1212,5 +1243,896 @@
       </section>
     </div>
   </main>
+  <script>
+    const sectionTables = {
+      steel: {
+        label: "Steel W-shapes",
+        E: 29000,
+        Fb: 30,
+        sections: [
+          { name: "W8x10", Ix: 30.8, Sx: 7.81, weight: 10 },
+          { name: "W10x12", Ix: 53.8, Sx: 10.9, weight: 12 },
+          { name: "W12x26", Ix: 204, Sx: 33.4, weight: 26 },
+          { name: "W14x22", Ix: 199, Sx: 29, weight: 22 },
+          { name: "W16x26", Ix: 301, Sx: 38.4, weight: 26 },
+          { name: "W18x35", Ix: 510, Sx: 57.6, weight: 35 },
+          { name: "W21x44", Ix: 843, Sx: 81.6, weight: 44 },
+          { name: "W24x55", Ix: 1350, Sx: 114, weight: 55 }
+        ]
+      },
+      lumber: {
+        label: "Douglas Fir-Larch No. 2",
+        E: 1600,
+        Fb: 0.9,
+        sections: [
+          { name: "2x8", Ix: 47.63, Sx: 13.14 },
+          { name: "2x10", Ix: 98.93, Sx: 21.39 },
+          { name: "2x12", Ix: 177.98, Sx: 31.64 }
+        ]
+      }
+    };
+
+    const state = {
+      support: "simple",
+      span: 20,
+      waste: 5,
+      material: "steel",
+      section: "W12x26",
+      deflectionLimit: 360,
+      pointLoads: [],
+      uniformLoads: [{ id: 1, intensity: 1, start: 0, end: 20 }]
+    };
+
+    let nextLoadId = 2;
+    let formError = "";
+    let dragState = null;
+    const inputPanel = document.querySelector(".input-body");
+    const resultsPanel = document.querySelector(".results");
+
+    document.querySelector(".static-badge").textContent = "Live analysis";
+    document.querySelector(".panel-heading .small-label").textContent = "Live inputs";
+    document.querySelector(".heading-copy").textContent =
+      "Adjust the beam setup to explore its response and checks.";
+    document.querySelector(".mockup-note").innerHTML =
+      "<strong>Preliminary analysis:</strong> Results use the assumptions and section data in this tool; verify designs against applicable codes and project requirements.";
+
+    function formatNumber(value, digits = 2) {
+      if (!Number.isFinite(value)) return "—";
+      const rounded = Math.abs(value) < 0.5 * (10 ** -digits) ? 0 : value;
+      return rounded.toFixed(digits);
+    }
+
+    function getSelectedSection(material = state.material, name = state.section) {
+      return sectionTables[material].sections.find(section => section.name === name);
+    }
+
+    function getEffectiveUniformLoads(input = state) {
+      return input.uniformLoads
+        .map(load => ({
+          ...load,
+          start: Math.max(0, load.start),
+          end: Math.min(input.span, load.end)
+        }))
+        .filter(load => load.end > load.start);
+    }
+
+    function validateInputs(input = state) {
+      if (!Number.isFinite(input.span) || input.span < 4 || input.span > 40) {
+        return "Span must be between 4 and 40 ft.";
+      }
+      if (!Number.isFinite(input.waste) || input.waste < 0 || input.waste > 15) {
+        return "Cutting/ordering waste must be between 0% and 15%.";
+      }
+      for (const load of input.pointLoads) {
+        if (!Number.isFinite(load.magnitude) || load.magnitude < 0) {
+          return "Point-load magnitudes must be finite and nonnegative.";
+        }
+        if (!Number.isFinite(load.position) || load.position < 0 || load.position > input.span) {
+          return "Point-load positions must be between 0 and the span length.";
+        }
+      }
+      for (const load of input.uniformLoads) {
+        if (!Number.isFinite(load.intensity) || load.intensity < 0) {
+          return "Uniform-load magnitudes must be finite and nonnegative.";
+        }
+        if (!Number.isFinite(load.start) || load.start < 0 || load.start > input.span) {
+          return "Uniform-load starts must be between 0 and the span length.";
+        }
+        if (!Number.isFinite(load.end) || load.end <= load.start || load.end > 40) {
+          return "Each uniform-load end must be after its start and no greater than 40 ft.";
+        }
+      }
+      if (!getSelectedSection()) return "Choose a section from the selected material.";
+      return "";
+    }
+
+    function calculateReactions(input = state) {
+      const uniformLoads = getEffectiveUniformLoads(input);
+      let totalLoad = 0;
+      let totalMomentAtLeft = 0;
+
+      for (const load of input.pointLoads) {
+        totalLoad += load.magnitude;
+        totalMomentAtLeft += load.magnitude * load.position;
+      }
+      for (const load of uniformLoads) {
+        const length = load.end - load.start;
+        const resultant = load.intensity * length;
+        totalLoad += resultant;
+        totalMomentAtLeft += resultant * (load.start + length / 2);
+      }
+
+      if (input.support === "cantilever") {
+        return {
+          leftVertical: totalLoad,
+          rightVertical: 0,
+          fixedMoment: totalMomentAtLeft
+        };
+      }
+
+      const rightVertical = totalMomentAtLeft / input.span;
+      return {
+        leftVertical: totalLoad - rightVertical,
+        rightVertical,
+        fixedMoment: 0
+      };
+    }
+
+    function calculateShearAt(x, reactions, input = state, side = "right") {
+      let shear = reactions.leftVertical;
+      for (const load of input.pointLoads) {
+        const passed = load.position < x ||
+          (side === "right" && Math.abs(load.position - x) < 1e-8);
+        if (passed) shear -= load.magnitude;
+      }
+      for (const load of getEffectiveUniformLoads(input)) {
+        shear -= load.intensity * Math.max(0, Math.min(x, load.end) - load.start);
+      }
+      return shear;
+    }
+
+    function calculateMomentAt(x, reactions, input = state) {
+      if (input.support === "cantilever") {
+        let moment = 0;
+        for (const load of input.pointLoads) {
+          moment -= load.magnitude * Math.max(0, load.position - x);
+        }
+        for (const load of getEffectiveUniformLoads(input)) {
+          const from = Math.max(x, load.start);
+          if (load.end > from) {
+            moment -= load.intensity *
+              ((load.end - x) ** 2 - (from - x) ** 2) / 2;
+          }
+        }
+        return moment;
+      }
+
+      let moment = reactions.leftVertical * x;
+      for (const load of input.pointLoads) {
+        moment -= load.magnitude * Math.max(0, x - load.position);
+      }
+      for (const load of getEffectiveUniformLoads(input)) {
+        const to = Math.min(x, load.end);
+        if (to > load.start) {
+          const length = to - load.start;
+          moment -= load.intensity *
+            (x * length - (to ** 2 - load.start ** 2) / 2);
+        }
+      }
+      return moment;
+    }
+
+    function buildAnalysisGrid(input = state) {
+      const positions = new Set();
+      const count = Math.ceil(input.span / 0.02);
+      for (let index = 0; index <= count; index += 1) {
+        positions.add((input.span * index / count).toFixed(8));
+      }
+      for (const load of input.pointLoads) {
+        positions.add(load.position.toFixed(8));
+      }
+      for (const load of input.uniformLoads) {
+        positions.add(load.start.toFixed(8));
+        positions.add(Math.min(load.end, input.span).toFixed(8));
+      }
+      return [...positions].map(Number).sort((a, b) => a - b);
+    }
+
+    function calculateShearSamples(grid, reactions, input = state) {
+      const pointPositions = new Set(input.pointLoads.map(load => load.position.toFixed(8)));
+      const samples = [];
+      for (const x of grid) {
+        if (pointPositions.has(x.toFixed(8))) {
+          samples.push({ x, value: calculateShearAt(x, reactions, input, "left") });
+          samples.push({ x, value: calculateShearAt(x, reactions, input, "right") });
+        } else {
+          samples.push({ x, value: calculateShearAt(x, reactions, input) });
+        }
+      }
+      return samples;
+    }
+
+    function calculateDeflection(grid, section, input = state, reactions = calculateReactions(input)) {
+      const curvature = grid.map(x =>
+        -calculateMomentAt(x, reactions, input) * 12 /
+        (sectionTables[input.material].E * section.Ix)
+      );
+      const slope = new Array(grid.length).fill(0);
+      const rawDeflection = new Array(grid.length).fill(0);
+
+      for (let index = 1; index < grid.length; index += 1) {
+        const dxInches = (grid[index] - grid[index - 1]) * 12;
+        slope[index] = slope[index - 1] +
+          (curvature[index - 1] + curvature[index]) * dxInches / 2;
+        rawDeflection[index] = rawDeflection[index - 1] +
+          (slope[index - 1] + slope[index]) * dxInches / 2;
+      }
+
+      const initialSlope = input.support === "simple"
+        ? -rawDeflection[rawDeflection.length - 1] / (input.span * 12)
+        : 0;
+      return grid.map((x, index) => ({
+        x,
+        value: rawDeflection[index] + initialSlope * x * 12
+      }));
+    }
+
+    function findMaximumAbsolute(samples) {
+      return samples.reduce((maximum, sample) =>
+        Math.abs(sample.value) > Math.abs(maximum.value) ? sample : maximum,
+      samples[0] || { x: 0, value: 0 });
+    }
+
+    function calculateChecks(section, response, input = state) {
+      const material = sectionTables[input.material];
+      const bendingStress = Math.abs(response.maxMoment.value) * 12 / section.Sx;
+      const allowableDeflection = input.span * 12 / input.deflectionLimit;
+      const maxDeflection = Math.abs(response.maxDeflection.value);
+      return {
+        bending: {
+          actual: bendingStress,
+          allowable: material.Fb,
+          ratio: material.Fb === 0 ? 0 : bendingStress / material.Fb,
+          passes: bendingStress <= material.Fb
+        },
+        deflection: {
+          actual: maxDeflection,
+          allowable: allowableDeflection,
+          ratio: allowableDeflection === 0 ? 0 : maxDeflection / allowableDeflection,
+          passes: maxDeflection <= allowableDeflection
+        }
+      };
+    }
+
+    function calculateBeamAnalysis(section, input = state) {
+      const reactions = calculateReactions(input);
+      const grid = buildAnalysisGrid(input);
+      const shearSamples = calculateShearSamples(grid, reactions, input);
+      const momentSamples = grid.map(x => ({
+        x,
+        value: calculateMomentAt(x, reactions, input)
+      }));
+      const deflectionSamples = calculateDeflection(grid, section, input, reactions);
+      const response = {
+        reactions,
+        grid,
+        shearSamples,
+        momentSamples,
+        deflectionSamples,
+        maxShear: findMaximumAbsolute(shearSamples),
+        maxMoment: findMaximumAbsolute(momentSamples),
+        maxDeflection: findMaximumAbsolute(deflectionSamples)
+      };
+      response.checks = calculateChecks(section, response, input);
+      return response;
+    }
+
+    function findLightestPassingSection(input = state) {
+      const candidates = sectionTables[input.material].sections
+        .map(section => ({
+          section,
+          response: calculateBeamAnalysis(section, input)
+        }))
+        .filter(candidate =>
+          candidate.response.checks.bending.passes &&
+          candidate.response.checks.deflection.passes
+        );
+
+      if (input.material === "steel") {
+        candidates.sort((a, b) =>
+          a.section.weight - b.section.weight ||
+          b.section.Ix - a.section.Ix
+        );
+      }
+      return candidates[0] || null;
+    }
+
+    function calculateOrderLength(input = state) {
+      return input.span * (1 + input.waste / 100);
+    }
+
+    function escapeAttribute(value) {
+      return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+        .replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    }
+
+    function renderLoadInput(kind, load, label) {
+      const isPoint = kind === "point";
+      const fields = isPoint
+        ? [
+            { name: "magnitude", label: "Magnitude", value: load.magnitude, unit: "kips", min: 0, step: "any" },
+            { name: "position", label: "Position", value: load.position, unit: "ft", min: 0, max: state.span, step: "0.01" }
+          ]
+        : [
+            { name: "intensity", label: "Magnitude", value: load.intensity, unit: "k/ft", min: 0, step: "any" },
+            { name: "start", label: "Start", value: load.start, unit: "ft", min: 0, max: state.span, step: "0.01" },
+            { name: "end", label: "End", value: load.end, unit: "ft", min: Number((load.start + 0.01).toFixed(2)), max: 40, step: "0.01" }
+          ];
+      const inputFields = fields.map(field => `
+        <label class="field">
+          <span class="field-label">${field.label}</span>
+          <span class="input-wrap">
+            <input class="unit-input" type="number" value="${formatNumber(field.value, 2)}"
+              min="${field.min}" ${field.max === undefined ? "" : `max="${field.max}"`}
+              step="${field.step}" data-load-kind="${kind}" data-load-id="${load.id}"
+              data-field="${field.name}" aria-label="${label} ${field.label.toLowerCase()} in ${field.unit}">
+            <span class="unit">${field.unit}</span>
+          </span>
+        </label>`).join("");
+      return `
+        <div class="load-card">
+          <div class="load-card-head">
+            <span class="load-name"><span class="load-icon" aria-hidden="true">${isPoint ? "↓" : "↧"}</span>${label}</span>
+            <button class="remove-button" type="button" data-action="remove-load"
+              data-load-kind="${kind}" data-load-id="${load.id}" aria-label="Remove ${label.toLowerCase()}">Remove</button>
+          </div>
+          <div class="${isPoint ? "two-col" : "three-col"}">${inputFields}</div>
+        </div>`;
+    }
+
+    function renderInputs() {
+      const material = sectionTables[state.material];
+      const section = getSelectedSection();
+      const steelOptions = sectionTables.steel.sections;
+      const lumberOptions = sectionTables.lumber.sections;
+      inputPanel.innerHTML = `
+        <section class="form-section" aria-labelledby="geometry-heading">
+          <h3 class="section-title" id="geometry-heading">Geometry &amp; supports</h3>
+          <label class="field">
+            <span class="field-label">Support type</span>
+            <select data-field="support" aria-label="Support type">
+              <option value="simple" ${state.support === "simple" ? "selected" : ""}>Simply supported</option>
+              <option value="cantilever" ${state.support === "cantilever" ? "selected" : ""}>Cantilever — fixed left</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Span</span>
+            <span class="input-wrap">
+              <input class="unit-input" type="number" value="${formatNumber(state.span, 1)}"
+                min="4" max="40" step="0.1" data-field="span" aria-label="Span in feet">
+              <span class="unit">ft</span>
+            </span>
+            <span class="span-control">
+              <input type="range" min="4" max="40" step="0.1" value="${state.span}"
+                data-field="span" aria-label="Span slider, 4 to 40 feet">
+              <span class="range-limits"><span>4 ft</span><span>40 ft</span></span>
+            </span>
+          </label>
+          <label class="field">
+            <span class="section-title">Cutting/ordering waste <span class="range-current">${state.waste}%</span></span>
+            <span class="span-control">
+              <input type="range" min="0" max="15" step="1" value="${state.waste}"
+                data-field="waste" aria-label="Cutting and ordering waste slider, 0 to 15 percent">
+              <span class="range-limits"><span>0%</span><span>15%</span></span>
+            </span>
+            <span class="helper-copy">Affects estimated order length only.</span>
+          </label>
+        </section>
+        <section class="form-section" aria-labelledby="loads-heading">
+          <h3 class="section-title" id="loads-heading">Loads
+            <span class="small-label">${state.pointLoads.length + state.uniformLoads.length} total</span>
+          </h3>
+          ${state.pointLoads.length
+            ? state.pointLoads.map(load => renderLoadInput("point", load, "Point load")).join("")
+            : '<p class="helper-copy">No point loads yet.</p>'}
+          ${state.uniformLoads.map(load => renderLoadInput("uniform", load, "Uniform load")).join("")}
+          <div class="button-row">
+            <button class="secondary-button" type="button" data-action="add-point">＋ Add point load</button>
+            <button class="secondary-button" type="button" data-action="add-uniform">＋ Add uniform load</button>
+          </div>
+          <p class="helper-copy">Drag point-load arrows along the beam; positions snap to 0.25 ft. Uniform loads extending past the beam are clipped.</p>
+        </section>
+        <section class="form-section" aria-labelledby="section-heading">
+          <h3 class="section-title" id="section-heading">Material &amp; section</h3>
+          <label class="field">
+            <span class="field-label">Material</span>
+            <select data-field="material" aria-label="Material">
+              <option value="steel" ${state.material === "steel" ? "selected" : ""}>Steel W-shapes</option>
+              <option value="lumber" ${state.material === "lumber" ? "selected" : ""}>Douglas Fir-Larch No. 2</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">Section</span>
+            <select data-field="section" aria-label="Section">
+              ${material.sections.map(item =>
+                `<option value="${item.name}" ${item.name === section.name ? "selected" : ""}>${item.name}</option>`
+              ).join("")}
+            </select>
+          </label>
+          <div class="section-property"><span>Elastic modulus, E</span><strong>${formatNumber(material.E, 0)} ksi</strong></div>
+          <div class="section-property"><span>Moment of inertia, Ix</span><strong>${formatNumber(section.Ix, 2)} in⁴</strong></div>
+          <div class="section-property"><span>Section modulus, Sx</span><strong>${formatNumber(section.Sx, 2)} in³</strong></div>
+          <div class="section-property"><span>Section weight</span><strong>${section.weight === undefined ? "Not listed" : `${section.weight} lb/ft`}</strong></div>
+          <div class="section-property"><span>Allowable bending, Fb</span><strong>${formatNumber(material.Fb, 3)} ksi</strong></div>
+        </section>
+        <section class="form-section" aria-labelledby="limit-heading">
+          <h3 class="section-title" id="limit-heading">Serviceability</h3>
+          <label class="field">
+            <span class="field-label">Deflection limit</span>
+            <select data-field="deflectionLimit" aria-label="Deflection limit">
+              <option value="240" ${state.deflectionLimit === 240 ? "selected" : ""}>L/240</option>
+              <option value="360" ${state.deflectionLimit === 360 ? "selected" : ""}>L/360</option>
+            </select>
+          </label>
+          <div class="assumption"><span aria-hidden="true">ⓘ</span>
+            <span><strong>Self-weight ignored.</strong> Load magnitudes are downward positive.</span>
+          </div>
+        </section>`;
+    }
+
+    function svgNumber(value) {
+      return Number(value.toFixed(2));
+    }
+
+    function renderBeamDrawing(response) {
+      const left = 100;
+      const right = 800;
+      const beamY = 100;
+      const toX = position => left + position / state.span * (right - left);
+      const uniformArrows = getEffectiveUniformLoads().map(load => {
+        const x1 = toX(load.start);
+        const x2 = toX(load.end);
+        const count = Math.max(2, Math.min(20, Math.floor((x2 - x1) / 42)));
+        const arrows = Array.from({ length: count + 1 }, (_, index) => {
+          const x = x1 + (x2 - x1) * index / count;
+          return `<line x1="${svgNumber(x)}" y1="31" x2="${svgNumber(x)}" y2="62"/>`;
+        }).join("");
+        return `<g class="uniform-load-line" marker-end="url(#arrow-yellow)">${arrows}</g>
+          <text class="beam-small-label" x="${svgNumber((x1 + x2) / 2)}" y="18" text-anchor="middle">${formatNumber(load.intensity, 2)} kips/ft</text>`;
+      }).join("");
+      const pointLoads = state.pointLoads.map(load => {
+        const x = toX(load.position);
+        return `<g class="point-load-handle" data-point-id="${load.id}" tabindex="0" role="slider"
+          aria-label="Point load position in feet"
+          aria-valuemin="0" aria-valuemax="${formatNumber(state.span, 2)}" aria-valuenow="${formatNumber(load.position, 2)}">
+          <line class="load-line" x1="${svgNumber(x)}" y1="34" x2="${svgNumber(x)}" y2="88" marker-end="url(#arrow-blue)"/>
+          <text class="beam-small-label" x="${svgNumber(x)}" y="29" text-anchor="middle">${formatNumber(load.magnitude, 2)} k</text>
+        </g>`;
+      }).join("");
+
+      let supports;
+      let reactions;
+      if (state.support === "cantilever") {
+        supports = `<rect x="76" y="78" width="17" height="44" rx="2" fill="#cfe1ff" stroke="#1762b5" stroke-width="2"/>
+          <path d="M75 80L64 88M75 89L64 97M75 98L64 106M75 107L64 115M75 116L64 124" stroke="#6c86a0" stroke-width="1.5"/>`;
+        reactions = `<g class="reaction-line" marker-end="url(#arrow-green)">
+            <line x1="${left}" y1="158" x2="${left}" y2="128"/>
+          </g>
+          <text class="beam-strong-label" x="${left + 24}" y="154">R = ${formatNumber(response.reactions.leftVertical, 2)} k</text>
+          <path d="M126 95A28 28 0 1 1 120 74" fill="none" stroke="#16834f" stroke-width="2" marker-end="url(#arrow-green)"/>
+          <text class="beam-small-label" x="146" y="68">${formatNumber(response.reactions.fixedMoment, 2)} kip-ft</text>`;
+      } else {
+        supports = `<polygon class="support-shape" points="${left},${beamY + 4} ${left - 16},${beamY + 29} ${left + 16},${beamY + 29}"/>
+          <line class="support-base" x1="${left - 21}" y1="${beamY + 32}" x2="${left + 21}" y2="${beamY + 32}"/>
+          <circle class="support-shape" cx="${right - 10}" cy="${beamY + 23}" r="5"/>
+          <circle class="support-shape" cx="${right + 10}" cy="${beamY + 23}" r="5"/>
+          <polygon class="support-shape" points="${right},${beamY + 4} ${right - 16},${beamY + 29} ${right + 16},${beamY + 29}"/>
+          <line class="support-base" x1="${right - 21}" y1="${beamY + 32}" x2="${right + 21}" y2="${beamY + 32}"/>`;
+        reactions = `<g class="reaction-line" marker-end="url(#arrow-green)">
+            <line x1="${left}" y1="158" x2="${left}" y2="136"/>
+            <line x1="${right}" y1="158" x2="${right}" y2="136"/>
+          </g>
+          <text class="beam-strong-label" x="${left}" y="173" text-anchor="middle">${formatNumber(response.reactions.leftVertical, 2)} k</text>
+          <text class="beam-strong-label" x="${right}" y="173" text-anchor="middle">${formatNumber(response.reactions.rightVertical, 2)} k</text>`;
+      }
+
+      const simple = state.support === "simple";
+      const desc = simple
+        ? `Simply supported ${formatNumber(state.span, 1)} ft beam.`
+        : `Cantilever beam fixed at the left, ${formatNumber(state.span, 1)} ft long.`;
+      return `<svg class="beam-svg" viewBox="0 0 900 184" preserveAspectRatio="none" role="img" aria-label="${desc}">
+        <defs>
+          <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#1762b5"/></marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#16834f"/></marker>
+          <marker id="arrow-yellow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#c68e00"/></marker>
+        </defs>
+        ${uniformArrows}${pointLoads}
+        <line class="beam-line" x1="${left}" y1="${beamY}" x2="${right}" y2="${beamY}"/>
+        ${supports}${reactions}
+        <line class="dimension" x1="${left + 20}" y1="145" x2="${right - 20}" y2="145"/>
+        <line class="dimension" x1="${left + 20}" y1="141" x2="${left + 20}" y2="149"/>
+        <line class="dimension" x1="${right - 20}" y1="141" x2="${right - 20}" y2="149"/>
+        <text class="beam-label" x="450" y="141" text-anchor="middle">${formatNumber(state.span, 1)} ft</text>
+      </svg>`;
+    }
+
+    function plotCoordinates(samples, value, kind, maxMagnitude) {
+      const x = 54 + samples.x / state.span * 796;
+      let y;
+      if (kind === "deflection") {
+        y = 24 + value / maxMagnitude * 56;
+      } else {
+        y = 56 - value / maxMagnitude * 32;
+      }
+      return { x: svgNumber(x), y: svgNumber(y) };
+    }
+
+    function renderDiagram(kind, response) {
+      const isDeflection = kind === "deflection";
+      const samples = kind === "shear" ? response.shearSamples
+        : kind === "moment" ? response.momentSamples : response.deflectionSamples;
+      const maximum = kind === "shear" ? response.maxShear
+        : kind === "moment" ? response.maxMoment : response.maxDeflection;
+      const magnitude = Math.max(Math.abs(maximum.value), 0.001) * 1.12;
+      const baseline = isDeflection ? 24 : 56;
+      const points = samples.map(sample => plotCoordinates(sample, sample.value, kind, magnitude));
+      const linePath = points.map((point, index) =>
+        `${index === 0 ? "M" : "L"}${point.x} ${point.y}`
+      ).join(" ");
+      const areaPath = `${linePath} L${points[points.length - 1].x} ${baseline} L${points[0].x} ${baseline} Z`;
+      const color = kind === "shear" ? "#1762b5" : kind === "moment" ? "#c68e00" : "#16834f";
+      const fill = kind === "shear" ? "#cfe1ff" : kind === "moment" ? "#fff0b8" : "#def3e4";
+      const maxX = svgNumber(54 + maximum.x / state.span * 796);
+      const maxPoint = plotCoordinates(maximum, maximum.value, kind, magnitude);
+      const initialX = svgNumber(54 + (state.span / 2) / state.span * 796);
+      const unit = kind === "shear" ? "kips" : kind === "moment" ? "kip-ft" : "in";
+      const title = kind === "shear" ? "Shear diagram" : kind === "moment" ? "Moment diagram" : "Deflected shape";
+      const maxText = `Max |${kind === "shear" ? "V" : kind === "moment" ? "M" : "y"}| ${formatNumber(Math.abs(maximum.value), 2)} ${unit} · at ${formatNumber(maximum.x, 2)} ft`;
+      const plotMetaClass = kind === "moment" ? "moment" : kind === "deflection" ? "deflection" : "";
+      const scaleLabels = isDeflection
+        ? `<text x="43" y="28" text-anchor="end">0</text><text x="43" y="84" text-anchor="end">${formatNumber(magnitude, 2)}</text>`
+        : `<text x="43" y="27" text-anchor="end">+${formatNumber(magnitude, 1)}</text>
+           <text x="43" y="59" text-anchor="end">0</text>
+           <text x="43" y="90" text-anchor="end">−${formatNumber(magnitude, 1)}</text>`;
+      const axis = isDeflection
+        ? `<line class="plot-axis" x1="54" y1="${baseline}" x2="850" y2="${baseline}"/>`
+        : `<line class="plot-grid" x1="54" y1="24" x2="850" y2="24"/>
+           <line class="plot-grid" x1="54" y1="88" x2="850" y2="88"/>
+           <line class="plot-axis" x1="54" y1="${baseline}" x2="850" y2="${baseline}"/>`;
+      return `<article class="card plot-card">
+        <div class="card-heading">
+          <div class="plot-title"><i class="plot-mark ${plotMetaClass}" aria-hidden="true"></i>
+            <div><h2>${title}</h2><p>${kind === "shear" ? "V(x) · kips" : kind === "moment" ? "M(x) · kip-ft" : "y(x) · inches"}</p></div>
+          </div>
+          <span class="plot-meta">${maxText}</span>
+        </div>
+        <svg class="plot-svg" data-plot="${kind}" viewBox="0 0 900 112" preserveAspectRatio="none" role="img" aria-label="${maxText}">
+          ${axis}
+          <path d="${areaPath}" fill="${fill}" opacity=".92"/>
+          <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+          <line class="plot-crosshair plot-cursor" x1="${initialX}" y1="13" x2="${initialX}" y2="92"/>
+          <circle cx="${maxPoint.x}" cy="${maxPoint.y}" r="4" fill="${color}" stroke="#fff" stroke-width="2"/>
+          ${scaleLabels}
+          <text x="54" y="106" text-anchor="middle">0</text>
+          <text x="850" y="106" text-anchor="middle">${formatNumber(state.span, 1)} ft</text>
+          <text x="${Math.min(maxPoint.x + 8, 820)}" y="${isDeflection ? maxPoint.y + 13 : maxPoint.y - 7}" fill="${color}">${formatNumber(Math.abs(maximum.value), 2)}</text>
+        </svg>
+      </article>`;
+    }
+
+    function renderCheckCard(title, check, unit, allowableLabel, formula) {
+      const ratioPercent = check.ratio * 100;
+      const barClass = ratioPercent > 100 ? "red" : ratioPercent >= 70 ? "amber" : "";
+      const statusClass = check.passes ? "" : "fail";
+      const fillWidth = Math.max(0, Math.min(ratioPercent, 100));
+      return `<article class="check-card ${statusClass}" title="${formula}">
+        <div class="check-top">
+          <div class="check-name"><span class="check-icon ${title === "Deflection" ? "amber" : ""}" aria-hidden="true">${title === "Bending" ? "↗" : "↕"}</span>${title}</div>
+          <span class="status ${statusClass}">${check.passes ? "PASS" : "FAIL"}</span>
+        </div>
+        <div class="check-values">
+          <div><span class="check-value-label">Actual</span><span class="check-value">${formatNumber(check.actual, 3)} <small>${unit}</small></span></div>
+          <div><span class="check-value-label">${allowableLabel}</span><span class="check-value">${formatNumber(check.allowable, 3)} <small>${unit}</small></span></div>
+        </div>
+        <div class="ratio-track" role="img" aria-label="${title} utilization ${formatNumber(ratioPercent, 1)} percent">
+          <div class="ratio-fill ${barClass}" style="width:${fillWidth}%"></div>
+        </div>
+        <div class="ratio-copy"><span>Utilization</span><strong>${formatNumber(ratioPercent, 1)}%</strong></div>
+      </article>`;
+    }
+
+    function interpolateSamples(samples, x) {
+      if (x <= samples[0].x) return samples[0].value;
+      for (let index = 1; index < samples.length; index += 1) {
+        if (samples[index].x >= x) {
+          const previous = samples[index - 1];
+          const current = samples[index];
+          const length = current.x - previous.x;
+          if (length === 0) return current.value;
+          const ratio = (x - previous.x) / length;
+          return previous.value + ratio * (current.value - previous.value);
+        }
+      }
+      return samples[samples.length - 1].value;
+    }
+
+    function updateDiagramReadout(x, response) {
+      const position = Math.max(0, Math.min(state.span, x));
+      const plotX = svgNumber(54 + position / state.span * 796);
+      document.querySelectorAll(".plot-cursor").forEach(line => {
+        line.setAttribute("x1", plotX);
+        line.setAttribute("x2", plotX);
+      });
+      const shear = calculateShearAt(position, response.reactions, state);
+      const moment = calculateMomentAt(position, response.reactions, state);
+      const deflection = interpolateSamples(response.deflectionSamples, position);
+      const readout = document.querySelector(".hover-readout");
+      readout.innerHTML = `<strong>Diagram readout · ${formatNumber(position, 2)} ft</strong>
+        <div class="readout-values">
+          <span>V <strong>${formatNumber(shear, 2)} kips</strong></span>
+          <span>M <strong>${formatNumber(moment, 2)} kip-ft</strong></span>
+          <span>y <strong>${formatNumber(deflection, 3)} in</strong></span>
+        </div>`;
+    }
+
+    function bindDiagramInteractions(response) {
+      document.querySelectorAll(".plot-svg").forEach(svg => {
+        svg.addEventListener("pointermove", event => {
+          const rect = svg.getBoundingClientRect();
+          const viewX = (event.clientX - rect.left) / rect.width * 900;
+          const position = (viewX - 54) / 796 * state.span;
+          updateDiagramReadout(position, response);
+        });
+      });
+
+      const beamSvg = document.querySelector(".beam-svg");
+      beamSvg.addEventListener("pointerdown", event => {
+        const handle = event.target.closest("[data-point-id]");
+        if (!handle) return;
+        const load = state.pointLoads.find(item => item.id === Number(handle.dataset.pointId));
+        if (!load) return;
+        dragState = { id: load.id, rect: beamSvg.getBoundingClientRect() };
+        beamSvg.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+      });
+      beamSvg.addEventListener("keydown", event => {
+        const handle = event.target.closest("[data-point-id]");
+        if (!handle || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        const load = state.pointLoads.find(item => item.id === Number(handle.dataset.pointId));
+        if (!load) return;
+        event.preventDefault();
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        load.position = Math.max(0, Math.min(state.span, load.position + direction * 0.25));
+        renderApp(true);
+        document.querySelector(`[data-point-id="${load.id}"]`)?.focus();
+      });
+    }
+
+    function renderOutputs() {
+      const error = formError || validateInputs();
+      if (error) {
+        resultsPanel.innerHTML = `<p class="validation-alert" role="alert">
+          <strong>Check the beam inputs</strong>${escapeAttribute(error)} Results are paused until the values are valid.
+        </p>`;
+        return;
+      }
+
+      const section = getSelectedSection();
+      const response = calculateBeamAnalysis(section);
+      const recommendation = findLightestPassingSection();
+      const orderLength = calculateOrderLength();
+      const wasteLength = orderLength - state.span;
+      const supportLabel = state.support === "simple" ? "Simply supported" : "Cantilever · fixed left";
+      const recommendationMarkup = recommendation
+        ? `<strong>Lightest passing section · ${recommendation.section.name}</strong>
+           <span>${state.material === "steel" ? `${recommendation.section.weight} lb/ft` : "First listed lumber size that passes"} · ${recommendation.section.name === state.section ? "Already selected" : "Both checks pass"}</span>`
+        : `<strong>No listed section passes both checks</strong><span>Try a larger span-compatible section or adjust the loads.</span>`;
+
+      resultsPanel.innerHTML = `
+        <article class="card" aria-labelledby="drawing-heading">
+          <div class="card-heading">
+            <div><h2 id="drawing-heading">Beam &amp; loading</h2><p>${supportLabel} · ${formatNumber(state.span, 1)} ft span</p></div>
+            <span class="example-tag">Live results</span>
+          </div>
+          ${renderBeamDrawing(response)}
+          <div class="beam-footer">
+            <div class="legend">
+              <span class="legend-item"><i class="legend-dot" aria-hidden="true"></i>Applied load</span>
+              <span class="legend-item"><i class="legend-dot green" aria-hidden="true"></i>Reaction</span>
+            </div>
+            <span>${state.support === "cantilever" ? `Fixed-end moment: ${formatNumber(response.reactions.fixedMoment, 2)} kip-ft` : "Reaction values from statics"}</span>
+          </div>
+        </article>
+        <div class="summary-grid" aria-label="Calculated analysis summary">
+          <div class="summary-item"><span class="summary-label">Maximum shear</span><span class="summary-value">${formatNumber(Math.abs(response.maxShear.value), 2)} <small>kips</small></span></div>
+          <div class="summary-item"><span class="summary-label">Maximum moment</span><span class="summary-value">${formatNumber(Math.abs(response.maxMoment.value), 2)} <small>kip-ft</small></span></div>
+          <div class="summary-item"><span class="summary-label">Maximum deflection</span><span class="summary-value">${formatNumber(Math.abs(response.maxDeflection.value), 3)} <small>in</small></span></div>
+          <div class="summary-item"><span class="summary-label">Estimated order length</span><span class="summary-value">${formatNumber(orderLength, 2)} <small>ft</small></span></div>
+        </div>
+        <p class="order-breakdown">${formatNumber(state.span, 2)} ft span + ${formatNumber(wasteLength, 2)} ft waste (${state.waste}%) = <strong>${formatNumber(orderLength, 2)} ft</strong> · Not rounded to stock lengths</p>
+        ${renderDiagram("shear", response)}
+        ${renderDiagram("moment", response)}
+        ${renderDiagram("deflection", response)}
+        <div class="hover-readout" aria-label="Synchronized diagram readout"></div>
+        <section class="card" aria-labelledby="checks-heading">
+          <div class="card-heading">
+            <div><h2 id="checks-heading">Design checks</h2><p>Selected section · ${section.name}</p></div>
+            <span class="example-tag">Preliminary checks</span>
+          </div>
+          <div class="check-grid">
+            ${renderCheckCard("Bending", response.checks.bending, "ksi", "Allowable", "Bending stress = maximum absolute moment × 12 / section modulus.")}
+            ${renderCheckCard("Deflection", response.checks.deflection, "in", `Allowable · L/${state.deflectionLimit}`, "Maximum absolute deflection compared with span / selected deflection ratio.")}
+          </div>
+        </section>
+        <section class="recommendation" aria-label="Lightest passing section recommendation">
+          <div class="recommendation-copy">
+            <span class="recommendation-icon" aria-hidden="true">✦</span>
+            <div class="recommendation-text">${recommendationMarkup}</div>
+          </div>
+          <button class="primary-button" type="button" data-action="use-recommendation" ${recommendation ? "" : "disabled"}>
+            ${recommendation?.section.name === state.section ? "Section selected" : "Use suggested section"}
+          </button>
+        </section>
+        <p class="footer-note">Results update as inputs change. Check assumptions and applicable design requirements.</p>`;
+      updateDiagramReadout(state.span / 2, response);
+      bindDiagramInteractions(response);
+    }
+
+    function renderApp(renderInputPanel = true) {
+      if (renderInputPanel) renderInputs();
+      renderOutputs();
+    }
+
+    function setFormError(message) {
+      formError = message;
+      renderOutputs();
+    }
+
+    function updateLoadState(target, value) {
+      const list = target.dataset.loadKind === "point" ? state.pointLoads : state.uniformLoads;
+      const load = list.find(item => item.id === Number(target.dataset.loadId));
+      if (!load) return;
+      load[target.dataset.field] = value;
+    }
+
+    function adjustForSpanChange() {
+      for (const load of state.pointLoads) {
+        load.position = Math.min(state.span, Math.max(0, load.position));
+      }
+      for (const load of state.uniformLoads) {
+        load.start = Math.min(state.span, Math.max(0, load.start));
+        if (load.end <= load.start) {
+          load.end = Math.min(40, load.start + 0.1);
+          if (load.end <= load.start) load.start = Math.max(0, load.end - 0.1);
+        }
+      }
+    }
+
+    function handleInputChange(event) {
+      const target = event.target;
+      const field = target.dataset.field;
+      if (!field) return;
+
+      if (target.type === "number") {
+        target.setCustomValidity("");
+        if (target.value.trim() === "" || !target.checkValidity()) {
+          setFormError(target.validationMessage || "Enter a valid finite number.");
+          return;
+        }
+      }
+
+      const value = target.tagName === "SELECT" ? target.value : Number(target.value);
+      formError = "";
+      if (field === "support") {
+        state.support = value;
+        if (state.support === "cantilever") {
+          for (const load of state.pointLoads) {
+            if (load.newlyAdded) {
+              load.position = state.span;
+              delete load.newlyAdded;
+            }
+          }
+        }
+        renderApp(true);
+        return;
+      }
+      if (field === "material") {
+        state.material = value;
+        state.section = sectionTables[value].sections[0].name;
+        renderApp(true);
+        return;
+      }
+      if (field === "section") {
+        state.section = value;
+        renderApp(true);
+        return;
+      }
+      if (field === "deflectionLimit") {
+        state.deflectionLimit = value;
+        renderApp(true);
+        return;
+      }
+      if (field === "span") {
+        state.span = value;
+        adjustForSpanChange();
+        const number = inputPanel.querySelector('input[type="number"][data-field="span"]');
+        const range = inputPanel.querySelector('input[type="range"][data-field="span"]');
+        if (number) number.value = formatNumber(state.span, 1);
+        if (range) range.value = state.span;
+        inputPanel.querySelectorAll('[data-load-kind="point"][data-field="position"]').forEach(input => {
+          input.max = state.span;
+          const load = state.pointLoads.find(item => item.id === Number(input.dataset.loadId));
+          if (load) input.value = formatNumber(load.position, 2);
+        });
+        inputPanel.querySelectorAll('[data-load-kind="uniform"][data-field="start"]').forEach(input => {
+          input.max = state.span;
+          const load = state.uniformLoads.find(item => item.id === Number(input.dataset.loadId));
+          if (load) input.value = formatNumber(load.start, 2);
+        });
+      } else if (field === "waste") {
+        state.waste = value;
+        const readout = inputPanel.querySelector(".range-current");
+        if (readout) readout.textContent = `${state.waste}%`;
+      } else if (target.dataset.loadKind) {
+        updateLoadState(target, value);
+      }
+      renderApp(false);
+    }
+
+    inputPanel.addEventListener("input", handleInputChange);
+    inputPanel.addEventListener("change", event => {
+      if (event.target.tagName === "SELECT") handleInputChange(event);
+    });
+
+    inputPanel.addEventListener("click", event => {
+      const button = event.target.closest("[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+      if (action === "add-point") {
+        state.pointLoads.push({
+          id: nextLoadId++,
+          magnitude: 1,
+          position: state.support === "cantilever" ? state.span : state.span / 2
+        });
+      } else if (action === "add-uniform") {
+        state.uniformLoads.push({
+          id: nextLoadId++,
+          intensity: 1,
+          start: 0,
+          end: state.span
+        });
+      } else if (action === "remove-load") {
+        const list = button.dataset.loadKind === "point" ? state.pointLoads : state.uniformLoads;
+        const index = list.findIndex(load => load.id === Number(button.dataset.loadId));
+        if (index >= 0) list.splice(index, 1);
+      }
+      formError = "";
+      renderApp(true);
+    });
+
+    resultsPanel.addEventListener("click", event => {
+      if (!event.target.closest('[data-action="use-recommendation"]')) return;
+      const recommendation = findLightestPassingSection();
+      if (!recommendation) return;
+      state.section = recommendation.section.name;
+      formError = "";
+      renderApp(true);
+    });
+
+    document.addEventListener("pointermove", event => {
+      if (!dragState) return;
+      const viewX = (event.clientX - dragState.rect.left) / dragState.rect.width * 900;
+      const rawPosition = (viewX - 100) / 700 * state.span;
+      const position = Math.max(0, Math.min(state.span, Math.round(rawPosition * 4) / 4));
+      const load = state.pointLoads.find(item => item.id === dragState.id);
+      if (!load || Math.abs(load.position - position) < 1e-9) return;
+      load.position = position;
+      renderApp(true);
+    });
+
+    document.addEventListener("pointerup", () => { dragState = null; });
+
+    renderApp(true);
+  </script>
 </body>
 </html>
