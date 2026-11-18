@@ -3,26 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f7fb">
+  <meta name="theme-color" content="#124e96">
   <title>Beam Designer</title>
   <style>
     :root {
       color-scheme: light;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #17243b;
-      background: #f5f7fb;
+      color: #16385c;
+      background: #edf2f5;
       font-synthesis: none;
       text-rendering: optimizeLegibility;
-      --ink: #17243b;
-      --muted: #718099;
-      --line: #e6ebf2;
-      --blue: #3168d5;
-      --blue-soft: #edf3ff;
-      --green: #148263;
-      --green-soft: #e8f6f0;
-      --amber: #bc7c13;
-      --amber-soft: #fff5df;
-      --card-shadow: 0 8px 26px rgb(34 55 88 / 5%);
+      --ink: #16385c;
+      --muted: #65798d;
+      --line: #d7e0e8;
+      --blue: #1762b5;
+      --blue-deep: #124e96;
+      --blue-soft: #e0edff;
+      --green: #16834f;
+      --green-soft: #def3e4;
+      --yellow: #e5ad18;
+      --yellow-soft: #fff0b8;
+      --amber: #a56d00;
+      --amber-soft: #fff0b8;
+      --card-shadow: 0 10px 28px rgb(20 56 92 / 9%);
     }
 
     * { box-sizing: border-box; }
@@ -30,7 +33,7 @@
     body {
       min-width: 320px;
       margin: 0;
-      background: #f5f7fb;
+      background: linear-gradient(125deg, #e4efff 0%, #f0f3f5 48%, #e6f3e9 100%);
     }
 
     button, input, select { font: inherit; }
@@ -41,15 +44,16 @@
       justify-content: space-between;
       min-height: 68px;
       padding: 0 4.2vw;
-      background: #fff;
-      border-bottom: 1px solid var(--line);
+      color: #fff;
+      background: linear-gradient(105deg, #124e96, #1762b5 70%, #2377bd);
+      border-bottom: 4px solid var(--yellow);
     }
 
     .brand {
       display: flex;
       align-items: center;
       gap: 11px;
-      color: var(--ink);
+      color: #fff;
       font-size: 15px;
       font-weight: 750;
       letter-spacing: -.025em;
@@ -60,8 +64,8 @@
       width: 34px;
       height: 34px;
       place-items: center;
-      color: white;
-      background: var(--blue);
+      color: var(--blue-deep);
+      background: var(--yellow);
       border-radius: 10px;
     }
 
@@ -71,7 +75,7 @@
       display: flex;
       align-items: center;
       gap: 17px;
-      color: var(--muted);
+      color: #e5efff;
       font-size: 12px;
     }
 
@@ -80,9 +84,9 @@
       align-items: center;
       gap: 7px;
       padding: 7px 10px;
-      color: #886117;
-      background: #fff5df;
-      border: 1px solid #f3e4bb;
+      color: #674700;
+      background: var(--yellow-soft);
+      border: 1px solid #f4d45d;
       border-radius: 999px;
       font-weight: 650;
     }
@@ -91,7 +95,7 @@
       width: 7px;
       height: 7px;
       content: "";
-      background: #d49a32;
+      background: var(--yellow);
       border-radius: 50%;
     }
 
@@ -107,11 +111,15 @@
       justify-content: space-between;
       gap: 20px;
       margin-bottom: 23px;
+      padding: 18px 20px;
+      background: linear-gradient(110deg, #dceaff, #fff2bd 58%, #def2e4);
+      border: 1px solid #cfdeeb;
+      border-radius: 16px;
     }
 
     .eyebrow {
       margin: 0 0 7px;
-      color: var(--blue);
+      color: var(--blue-deep);
       font-size: 11px;
       font-weight: 750;
       letter-spacing: .12em;
@@ -136,9 +144,9 @@
       max-width: 410px;
       margin: 0;
       padding: 10px 13px;
-      color: #765a24;
-      background: #fff9eb;
-      border: 1px solid #f1e4c4;
+      color: #654d13;
+      background: linear-gradient(105deg, #fff0b8, #fff8df);
+      border: 1px solid #efd36e;
       border-radius: 10px;
       font-size: 11px;
       line-height: 1.5;
@@ -162,6 +170,7 @@
       position: sticky;
       top: 16px;
       overflow: hidden;
+      border-top: 5px solid var(--blue);
     }
 
     .panel-heading {
@@ -169,7 +178,8 @@
       align-items: center;
       justify-content: space-between;
       padding: 17px 19px;
-      border-bottom: 1px solid var(--line);
+      background: linear-gradient(100deg, #e0edff, #f3f7fb);
+      border-bottom: 1px solid #cbdced;
     }
 
     .panel-heading h2, .card-heading h2 {
@@ -189,12 +199,22 @@
     .input-body { padding: 17px 19px 19px; }
     .form-section + .form-section { margin-top: 21px; }
 
+    .form-section {
+      padding-left: 10px;
+      border-left: 3px solid var(--blue);
+      border-radius: 3px;
+    }
+
+    .form-section:nth-of-type(2) { border-left-color: var(--yellow); }
+    .form-section:nth-of-type(3) { border-left-color: var(--green); }
+    .form-section:nth-of-type(4) { border-left-color: #8493a3; }
+
     .section-title {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin: 0 0 11px;
-      color: #53627a;
+      color: var(--blue-deep);
       font-size: 10px;
       font-weight: 760;
       letter-spacing: .085em;
@@ -207,7 +227,7 @@
     .field-label {
       display: block;
       margin-bottom: 6px;
-      color: #526179;
+      color: #355574;
       font-size: 11px;
       font-weight: 650;
     }
@@ -218,9 +238,9 @@
       width: 100%;
       height: 36px;
       padding: 0 11px;
-      color: #263650;
-      background: #fbfcfe;
-      border: 1px solid #dfe6ef;
+      color: #233f5e;
+      background: #f2f7ff;
+      border: 1px solid #c5d9f1;
       border-radius: 7px;
       outline: none;
       font-size: 12px;
@@ -231,7 +251,7 @@
       cursor: default;
     }
 
-    input:disabled, select:disabled { color: #34445e; }
+    input:disabled, select:disabled { color: #233f5e; }
 
     .unit-input { padding-right: 42px !important; }
 
@@ -239,7 +259,7 @@
       position: absolute;
       top: 50%;
       right: 11px;
-      color: #8692a4;
+      color: #6d8196;
       font-size: 10px;
       pointer-events: none;
       transform: translateY(-50%);
@@ -261,28 +281,43 @@
       accent-color: var(--blue);
     }
 
+    input[aria-label^="Cutting"] { accent-color: var(--yellow); }
+
     .range-limits {
       display: flex;
       justify-content: space-between;
       margin-top: 3px;
-      color: #97a2b3;
+      color: #75899d;
       font-size: 9px;
     }
 
     .range-current {
-      color: #526179;
+      padding: 3px 7px;
+      color: #674700;
+      background: var(--yellow-soft);
+      border-radius: 999px;
       font-size: 10px;
       font-weight: 700;
     }
 
     .load-card {
       padding: 11px;
-      background: #fbfcfe;
-      border: 1px solid #e9edf3;
+      background: #f3f7fb;
+      border: 1px solid #d7e1eb;
       border-radius: 9px;
     }
 
     .load-card + .load-card { margin-top: 8px; }
+
+    .load-card:first-of-type {
+      background: #eaf2ff;
+      border-color: #c8dcf7;
+    }
+
+    .load-card:nth-of-type(2) {
+      background: #fff5cf;
+      border-color: #f0d978;
+    }
 
     .load-card-head {
       display: flex;
@@ -295,7 +330,7 @@
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      color: #35445c;
+      color: #284766;
       font-size: 11px;
       font-weight: 680;
     }
@@ -305,15 +340,15 @@
       width: 19px;
       height: 19px;
       place-items: center;
-      color: var(--blue);
-      background: var(--blue-soft);
+      color: var(--blue-deep);
+      background: #cfe1ff;
       border-radius: 5px;
       font-size: 12px;
     }
 
     .remove-button {
       padding: 3px 5px;
-      color: #8793a4;
+      color: #647a8f;
       background: transparent;
       border: 0;
       font-size: 10px;
@@ -341,20 +376,27 @@
     }
 
     .secondary-button {
-      color: #47618a;
-      background: #fff;
+      color: var(--blue-deep);
+      background: #e7f0ff;
+      border-color: #bfd4ef;
+    }
+
+    .button-row .secondary-button:last-child {
+      color: #725000;
+      background: #fff1bd;
+      border-color: #edd46a;
     }
 
     .primary-button {
       color: #fff;
       background: var(--blue);
-      border-color: var(--blue);
-      box-shadow: 0 3px 8px rgb(49 104 213 / 16%);
+      border-color: var(--blue-deep);
+      box-shadow: 0 4px 10px rgb(23 98 181 / 24%);
     }
 
     .helper-copy {
       margin: 8px 0 0;
-      color: #8a96a8;
+      color: #6f8397;
       font-size: 9px;
       line-height: 1.45;
     }
@@ -365,14 +407,14 @@
       justify-content: space-between;
       margin-top: 9px;
       padding: 9px 10px;
-      color: #69778d;
-      background: #f8faff;
+      color: #526d86;
+      background: #edf3f7;
       border-radius: 7px;
       font-size: 9px;
     }
 
     .section-property strong {
-      color: #3a4a63;
+      color: #294966;
       font-size: 10px;
       font-weight: 650;
     }
@@ -382,14 +424,14 @@
       gap: 8px;
       margin-top: 16px;
       padding: 10px;
-      color: #69778d;
-      background: #f7f9fc;
+      color: #50677d;
+      background: #e9eff3;
       border-radius: 8px;
       font-size: 9px;
       line-height: 1.45;
     }
 
-    .assumption strong { color: #43536b; }
+    .assumption strong { color: #294966; }
 
     .results { display: grid; gap: 15px; min-width: 0; }
     .card { padding: 17px 19px; min-width: 0; }
@@ -410,8 +452,8 @@
 
     .example-tag {
       padding: 5px 8px;
-      color: #61718a;
-      background: #f3f6fa;
+      color: #365a7a;
+      background: #e1edf6;
       border-radius: 999px;
       font-size: 9px;
       font-weight: 650;
@@ -445,12 +487,13 @@
       font-weight: 700;
     }
 
-    .beam-line { stroke: #2e4566; stroke-width: 5; stroke-linecap: round; }
-    .support-shape { fill: #e8eef8; stroke: #647a9b; stroke-width: 1.5; }
-    .support-base { stroke: #9cabc0; stroke-width: 1.5; }
-    .load-line { stroke: #4676d2; stroke-width: 1.7; }
-    .reaction-line { stroke: #148263; stroke-width: 1.6; }
-    .dimension { stroke: #a7b3c3; stroke-width: 1; }
+    .beam-line { stroke: #1762b5; stroke-width: 6; stroke-linecap: round; }
+    .support-shape { fill: #cfe1ff; stroke: #1762b5; stroke-width: 1.7; }
+    .support-base { stroke: #7d93a7; stroke-width: 1.5; }
+    .load-line { stroke: #1762b5; stroke-width: 1.7; }
+    .uniform-load-line { stroke: #c68e00; stroke-width: 1.9; }
+    .reaction-line { stroke: #16834f; stroke-width: 1.8; }
+    .dimension { stroke: #7d93a7; stroke-width: 1; }
 
     .beam-footer {
       display: flex;
@@ -469,7 +512,7 @@
     .legend-dot {
       width: 7px;
       height: 7px;
-      background: #4676d2;
+      background: #1762b5;
       border-radius: 50%;
     }
 
@@ -484,39 +527,59 @@
 
     .summary-item {
       padding: 9px 11px;
-      background: #f8faff;
-      border: 1px solid #edf1f7;
+      background: #edf3f7;
+      border: 1px solid #dce5ec;
       border-radius: 8px;
+    }
+
+    .summary-item:nth-child(1) {
+      background: #dceaff;
+      border-color: #b7d0f2;
+    }
+
+    .summary-item:nth-child(2) {
+      background: #fff0b8;
+      border-color: #efd66b;
+    }
+
+    .summary-item:nth-child(3) {
+      background: #def3e4;
+      border-color: #b8dfc3;
+    }
+
+    .summary-item:nth-child(4) {
+      background: #e8edf1;
+      border-color: #d4dee5;
     }
 
     .summary-label {
       display: block;
       margin-bottom: 5px;
-      color: #8090a5;
+      color: #576e84;
       font-size: 9px;
     }
 
     .summary-value {
-      color: #263851;
+      color: #16385c;
       font-size: 14px;
       font-weight: 710;
       letter-spacing: -.02em;
     }
 
     .summary-value small {
-      color: #8290a4;
+      color: #5f7387;
       font-size: 9px;
       font-weight: 550;
     }
 
     .order-breakdown {
       margin: -5px 0 0;
-      color: #7b899d;
+      color: #526b82;
       font-size: 9px;
       line-height: 1.5;
     }
 
-    .order-breakdown strong { color: #3d506b; }
+    .order-breakdown strong { color: var(--green); }
 
     .plot-card { padding-bottom: 10px; }
     .plot-card .card-heading { margin-bottom: 7px; }
@@ -534,20 +597,20 @@
       border-radius: 3px;
     }
 
-    .plot-mark.moment { background: #8b68d4; }
-    .plot-mark.deflection { background: #e49a3b; }
+    .plot-mark.moment { background: var(--yellow); }
+    .plot-mark.deflection { background: var(--green); }
 
     .plot-meta {
-      color: #77869b;
+      color: #597187;
       font-size: 9px;
       text-align: right;
     }
 
     .plot-svg { height: 94px; }
-    .plot-svg text { fill: #8290a4; font-family: inherit; font-size: 9px; }
-    .plot-axis { stroke: #d9e0ea; stroke-width: 1; }
-    .plot-grid { stroke: #edf1f6; stroke-width: 1; stroke-dasharray: 3 4; }
-    .plot-crosshair { stroke: #647b9d; stroke-width: 1; stroke-dasharray: 4 4; }
+    .plot-svg text { fill: #5d7387; font-family: inherit; font-size: 9px; }
+    .plot-axis { stroke: #aab9c5; stroke-width: 1; }
+    .plot-grid { stroke: #dce4e9; stroke-width: 1; stroke-dasharray: 3 4; }
+    .plot-crosshair { stroke: #536b80; stroke-width: 1; stroke-dasharray: 4 4; }
 
     .hover-readout {
       display: flex;
@@ -556,14 +619,14 @@
       gap: 10px;
       margin-top: 2px;
       padding: 8px 10px;
-      color: #586981;
-      background: #f7f9fc;
+      color: #405c76;
+      background: #e7eef3;
       border-radius: 7px;
       font-size: 9px;
     }
 
     .hover-readout strong {
-      color: #344660;
+      color: #1b3c5b;
       font-size: 9px;
       font-weight: 700;
     }
@@ -582,6 +645,16 @@
       border-radius: 10px;
     }
 
+    .check-card:first-child {
+      background: linear-gradient(135deg, #e1f4e7, #f8fcf8);
+      border-color: #b8dfc3;
+    }
+
+    .check-card:last-child {
+      background: linear-gradient(135deg, #fff2c2, #fffaf0);
+      border-color: #efd981;
+    }
+
     .check-top {
       display: flex;
       align-items: center;
@@ -593,7 +666,7 @@
       display: flex;
       align-items: center;
       gap: 7px;
-      color: #3c4b63;
+      color: #244663;
       font-size: 11px;
       font-weight: 700;
     }
@@ -617,8 +690,8 @@
 
     .status {
       padding: 5px 7px;
-      color: #127553;
-      background: #e8f6f0;
+      color: #11633e;
+      background: #ccebd5;
       border-radius: 999px;
       font-size: 8px;
       font-weight: 800;
@@ -635,18 +708,18 @@
     .check-value-label {
       display: block;
       margin-bottom: 4px;
-      color: #8995a7;
+      color: #627b8e;
       font-size: 8px;
     }
 
     .check-value {
-      color: #293b56;
+      color: #1f3e5a;
       font-size: 13px;
       font-weight: 730;
     }
 
     .check-value small {
-      color: #8390a3;
+      color: #667e91;
       font-size: 9px;
       font-weight: 550;
     }
@@ -654,23 +727,23 @@
     .ratio-track {
       height: 6px;
       overflow: hidden;
-      background: #edf1f5;
+      background: #dbe4e9;
       border-radius: 99px;
     }
 
     .ratio-fill {
       height: 100%;
-      background: #20a477;
+      background: #16834f;
       border-radius: inherit;
     }
 
-    .ratio-fill.amber { background: #dfa43e; }
+    .ratio-fill.amber { background: #dfa900; }
 
     .ratio-copy {
       display: flex;
       justify-content: space-between;
       margin-top: 6px;
-      color: #8592a4;
+      color: #5e7589;
       font-size: 8px;
     }
 
@@ -680,8 +753,9 @@
       justify-content: space-between;
       gap: 16px;
       padding: 14px 15px;
-      background: #f5f8ff;
-      border: 1px solid #e3ebfa;
+      background: linear-gradient(110deg, #dceaff, #e2f4e6);
+      border: 1px solid #bed8c6;
+      border-left: 5px solid var(--green);
       border-radius: 10px;
     }
 
@@ -698,22 +772,22 @@
       width: 32px;
       height: 32px;
       place-items: center;
-      color: var(--blue);
-      background: #e5edff;
+      color: #6a4b00;
+      background: var(--yellow-soft);
       border-radius: 9px;
       font-weight: 800;
     }
 
     .recommendation-text strong {
       display: block;
-      color: #263851;
+      color: #16385c;
       font-size: 11px;
     }
 
     .recommendation-text span {
       display: block;
       margin-top: 4px;
-      color: #74839b;
+      color: #526d82;
       font-size: 9px;
     }
 
@@ -721,7 +795,7 @@
 
     .footer-note {
       margin: 0;
-      color: #929eaf;
+      color: #64798c;
       font-size: 9px;
       text-align: center;
     }
@@ -947,17 +1021,20 @@
             <desc id="beam-desc">A 20 foot beam with a one kip per foot downward uniform load, a zero point load at midspan, and ten kip placeholder reactions at both supports.</desc>
             <defs>
               <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-                <path d="M0 0L8 4L0 8Z" fill="#4676d2"/>
+                <path d="M0 0L8 4L0 8Z" fill="#1762b5"/>
               </marker>
               <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-                <path d="M0 0L8 4L0 8Z" fill="#148263"/>
+                <path d="M0 0L8 4L0 8Z" fill="#16834f"/>
+              </marker>
+              <marker id="arrow-yellow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                <path d="M0 0L8 4L0 8Z" fill="#c68e00"/>
               </marker>
               <marker id="arrow-gray" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">
                 <path d="M0 0L7 3.5L0 7Z" fill="#99a8bd"/>
               </marker>
             </defs>
             <text class="beam-small-label" x="450" y="12" text-anchor="middle">Uniform load · 1.00 kips/ft</text>
-            <g class="load-line" marker-end="url(#arrow-blue)">
+            <g class="uniform-load-line" marker-end="url(#arrow-yellow)">
               <line x1="120" y1="24" x2="120" y2="55"/>
               <line x1="167" y1="24" x2="167" y2="55"/>
               <line x1="214" y1="24" x2="214" y2="55"/>
@@ -1020,8 +1097,8 @@
             <line class="plot-grid" x1="54" y1="28" x2="850" y2="28"/>
             <line class="plot-grid" x1="54" y1="84" x2="850" y2="84"/>
             <line class="plot-axis" x1="54" y1="56" x2="850" y2="56"/>
-            <path d="M54 28 L850 84 L850 56 L54 56 Z" fill="#dce8ff" opacity=".92"/>
-            <path d="M54 28 L850 84" fill="none" stroke="#3973d6" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M54 28 L850 84 L850 56 L54 56 Z" fill="#cfe1ff" opacity=".96"/>
+            <path d="M54 28 L850 84" fill="none" stroke="#1762b5" stroke-width="2.7" stroke-linecap="round"/>
             <line class="plot-crosshair" x1="452" y1="14" x2="452" y2="91"/>
             <text x="43" y="31" text-anchor="end">+10</text>
             <text x="43" y="59" text-anchor="end">0</text>
@@ -1029,7 +1106,7 @@
             <text x="54" y="106" text-anchor="middle">0</text>
             <text x="452" y="106" text-anchor="middle">10</text>
             <text x="850" y="106" text-anchor="middle">20 ft</text>
-            <text x="459" y="18" fill="#536986">cursor</text>
+            <text x="459" y="18" fill="#405c76">cursor</text>
           </svg>
         </article>
 
@@ -1041,16 +1118,16 @@
           <svg class="plot-svg" viewBox="0 0 900 112" role="img" aria-label="Illustrative moment diagram with a positive parabolic curve and a fifty kip-foot maximum at midspan">
             <line class="plot-grid" x1="54" y1="22" x2="850" y2="22"/>
             <line class="plot-axis" x1="54" y1="84" x2="850" y2="84"/>
-            <path d="M54 84 C220 43 320 22 452 22 C584 22 684 43 850 84 L850 84 L54 84 Z" fill="#eee8fb"/>
-            <path d="M54 84 C220 43 320 22 452 22 C584 22 684 43 850 84" fill="none" stroke="#8b68d4" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M54 84 C220 43 320 22 452 22 C584 22 684 43 850 84 L850 84 L54 84 Z" fill="#fff0b8"/>
+            <path d="M54 84 C220 43 320 22 452 22 C584 22 684 43 850 84" fill="none" stroke="#c68e00" stroke-width="2.7" stroke-linecap="round"/>
             <line class="plot-crosshair" x1="452" y1="14" x2="452" y2="91"/>
-            <circle cx="452" cy="22" r="4" fill="#8b68d4" stroke="#fff" stroke-width="2"/>
+            <circle cx="452" cy="22" r="4" fill="#c68e00" stroke="#fff" stroke-width="2"/>
             <text x="43" y="25" text-anchor="end">50</text>
             <text x="43" y="87" text-anchor="end">0</text>
             <text x="54" y="106" text-anchor="middle">0</text>
             <text x="452" y="106" text-anchor="middle">10</text>
             <text x="850" y="106" text-anchor="middle">20 ft</text>
-            <text x="463" y="19" fill="#7355b6">50.0</text>
+            <text x="463" y="19" fill="#805800">50.0</text>
           </svg>
         </article>
 
@@ -1062,16 +1139,16 @@
           <svg class="plot-svg" viewBox="0 0 900 112" role="img" aria-label="Illustrative downward deflection curve with a maximum magnitude of zero point six zero nine inches at midspan">
             <line class="plot-grid" x1="54" y1="25" x2="850" y2="25"/>
             <line class="plot-axis" x1="54" y1="25" x2="850" y2="25"/>
-            <path d="M54 25 C220 48 320 80 452 86 C584 80 684 48 850 25 L850 25 L54 25 Z" fill="#fff0db"/>
-            <path d="M54 25 C220 48 320 80 452 86 C584 80 684 48 850 25" fill="none" stroke="#dc9236" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M54 25 C220 48 320 80 452 86 C584 80 684 48 850 25 L850 25 L54 25 Z" fill="#def3e4"/>
+            <path d="M54 25 C220 48 320 80 452 86 C584 80 684 48 850 25" fill="none" stroke="#16834f" stroke-width="2.7" stroke-linecap="round"/>
             <line class="plot-crosshair" x1="452" y1="14" x2="452" y2="91"/>
-            <circle cx="452" cy="86" r="4" fill="#dc9236" stroke="#fff" stroke-width="2"/>
+            <circle cx="452" cy="86" r="4" fill="#16834f" stroke="#fff" stroke-width="2"/>
             <text x="43" y="28" text-anchor="end">0</text>
             <text x="43" y="89" text-anchor="end">0.61</text>
             <text x="54" y="106" text-anchor="middle">0</text>
             <text x="452" y="106" text-anchor="middle">10</text>
             <text x="850" y="106" text-anchor="middle">20 ft</text>
-            <text x="463" y="82" fill="#a86715">0.609</text>
+            <text x="463" y="82" fill="#11633e">0.609</text>
           </svg>
         </article>
 
